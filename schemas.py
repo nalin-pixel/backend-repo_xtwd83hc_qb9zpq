@@ -1,48 +1,119 @@
 """
-Database Schemas
+Database Schemas for ThePowerSite replacement demo
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
-
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Each Pydantic model maps to a MongoDB collection using the lowercase
+class name as the collection name.
 """
+from __future__ import annotations
+from typing import List, Optional, Literal, Dict, Any
+from pydantic import BaseModel, Field, HttpUrl
 
-from pydantic import BaseModel, Field
-from typing import Optional
+# Core catalog entities
+class Brand(BaseModel):
+    name: str = Field(..., description="Brand display name, e.g., Hyundai")
+    slug: str = Field(..., description="URL-safe slug, e.g., hyundai")
+    color: Optional[str] = Field(None, description="Hex color for brand accents")
+    logo_url: Optional[HttpUrl] = None
 
-# Example schemas (replace with your own):
+class Category(BaseModel):
+    name: str
+    slug: str
+    parent_slug: Optional[str] = Field(None, description="Parent category slug for hierarchy")
+    image_url: Optional[HttpUrl] = None
 
-class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+PowerSource = Literal["petrol", "diesel", "electric", "battery", "corded", "air", "manual"]
+
+class PriceInfo(BaseModel):
+    inc_vat: float = Field(..., ge=0)
+    ex_vat: float = Field(..., ge=0)
+    currency: Literal["GBP"] = "GBP"
+    finance_available: bool = True
+
+class Media(BaseModel):
+    images: List[HttpUrl] = []
+    video_url: Optional[HttpUrl] = None
+    spin_360_url: Optional[HttpUrl] = None
+
+class SpecItem(BaseModel):
+    label: str
+    value: str
 
 class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+    sku: str
+    title: str
+    short_bullets: List[str] = []
+    description: Optional[str] = None
+    brand: str = Field(..., description="Brand slug")
+    category: str = Field(..., description="Category slug")
+    power_source: Optional[PowerSource] = None
+    capacity: Optional[str] = None
+    size: Optional[str] = None
+    weight_kg: Optional[float] = Field(None, ge=0)
+    application: Optional[List[str]] = None
+    price: PriceInfo
+    media: Media = Media()
+    specs: List[SpecItem] = []
+    rating_avg: float = 0
+    rating_count: int = 0
+    accessories: List[str] = Field(default_factory=list, description="SKU list of accessories")
+    related_skus: List[str] = Field(default_factory=list)
+    stock: int = 10
 
-# Add your own schemas here:
-# --------------------------------------------------
+class Review(BaseModel):
+    sku: str
+    title: str
+    body: str
+    rating: int = Field(..., ge=1, le=5)
+    author: str
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class Bundle(BaseModel):
+    sku: str
+    title: str
+    items: List[str] = Field(default_factory=list, description="SKUs included")
+    price: PriceInfo
+
+class SparePart(BaseModel):
+    sku: str
+    title: str
+    compatible_skus: List[str] = []
+    price: PriceInfo
+
+class Address(BaseModel):
+    full_name: str
+    line1: str
+    line2: Optional[str] = None
+    city: str
+    county: Optional[str] = None
+    postcode: str
+    country: str = "UK"
+
+class OrderItem(BaseModel):
+    sku: str
+    title: str
+    qty: int = Field(..., ge=1)
+    unit_price_inc_vat: float
+
+class Order(BaseModel):
+    email: str
+    phone: Optional[str] = None
+    shipping_address: Address
+    billing_address: Optional[Address] = None
+    items: List[OrderItem]
+    total_inc_vat: float
+    payment_method: Literal["card", "apple_pay", "google_pay", "cod"] = "card"
+
+# Simple response shapes
+class SearchSuggestion(BaseModel):
+    sku: str
+    title: str
+    brand: str
+    category: str
+    price_inc_vat: float
+    image: Optional[HttpUrl] = None
+
+# Optional: lightweight user for dashboard demo
+class User(BaseModel):
+    name: str
+    email: str
+    address: Optional[str] = None
+    is_active: bool = True
